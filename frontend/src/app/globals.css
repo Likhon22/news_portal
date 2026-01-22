@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #D92128;
+  --color-primary-hover: #b91c22;
+  --color-secondary: #0a0a0a;
+  --color-muted-bg: #F9FAFB;
+  --font-main: "Hind Siliguri", sans-serif;
+
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1440px;
+}
+
+:root {
+  --font-main: "Hind Siliguri", sans-serif;
+  --font-fallback: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-white text-gray-900 font-main antialiased overflow-x-hidden;
+    font-family: var(--font-main), var(--font-fallback);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-bold tracking-tight text-gray-900 leading-tight;
+  }
+}
+
+@layer components {
+  .container {
+    @apply w-full max-w-[1320px] mx-auto px-4 md:px-8 lg:px-12 box-border;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
