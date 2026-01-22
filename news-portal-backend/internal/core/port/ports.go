@@ -12,7 +12,10 @@ import (
 type OwnerRepository interface {
 	CreateOwner(ctx context.Context, name, email, passwordHash string) (*domain.Owner, error)
 	GetOwnerByEmail(ctx context.Context, email string) (*domain.Owner, error)
+	GetOwnerByID(ctx context.Context, id uuid.UUID) (*domain.Owner, error)
 	CountOwners(ctx context.Context) (int64, error)
+	ListOwners(ctx context.Context) ([]*domain.Owner, error)
+	UpdateOwnerPassword(ctx context.Context, id uuid.UUID, passwordHash string) error
 }
 
 type CategoryRepository interface {
@@ -38,6 +41,9 @@ type NewsRepository interface {
 
 type AuthService interface {
 	Login(ctx context.Context, email, password string) (string, error)
+	Register(ctx context.Context, name, email, password string) (*domain.Owner, error)
+	ChangePassword(ctx context.Context, id uuid.UUID, oldPassword, newPassword string) error
+	ListUsers(ctx context.Context) ([]*domain.Owner, error)
 }
 
 type NewsService interface {

@@ -53,3 +53,42 @@
     scrollbar-width: none;
   }
 }
+
+/* TipTap Content Styles */
+.tiptap .text-align-left,
+.prose .text-align-left {
+  text-align: left;
+}
+
+.tiptap .text-align-center,
+.prose .text-align-center {
+  text-align: center !important;
+}
+
+.tiptap .text-align-right,
+.prose .text-align-right {
+  text-align: right !important;
+}
+
+.tiptap .text-align-justify,
+.prose .text-align-justify {
+  text-align: justify !important;
+}
+
+.tiptap ul,
+.prose ul {
+  padding: 0 1rem;
+  margin: 1.25rem 1rem 1.25rem 0.4rem;
+  list-style-type: disc;
+}
+
+.tiptap ol,
+.prose ol {
+  padding: 0 1rem;
+  margin: 1.25rem 1rem 1.25rem 0.4rem;
+  list-style-type: decimal;
+}
+
+.prose {
+  max-width: none;
+}

@@ -34,7 +34,7 @@ export function OverviewCharts({ categoryStats, topNews }: OverviewChartsProps) 
                 <CardContent className="pl-2">
                     <div className="h-[300px] w-full">
                         {categoryStats.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                 <PieChart>
                                     <Pie
                                         data={categoryStats}
@@ -44,7 +44,7 @@ export function OverviewCharts({ categoryStats, topNews }: OverviewChartsProps) 
                                         outerRadius={80}
                                         fill="#8884d8"
                                         dataKey="value"
-                                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                        label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                                     >
                                         {categoryStats.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -71,7 +71,7 @@ export function OverviewCharts({ categoryStats, topNews }: OverviewChartsProps) 
                 <CardContent>
                     <div className="h-[300px] w-full">
                         {topNews.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                 <BarChart data={topNews} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis type="number" />

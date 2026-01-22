@@ -35,28 +35,66 @@ func (q *Queries) CountOwners(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const createCategory = `-- name: CreateCategory :one
+INSERT INTO categories (name, name_bn, slug, description)
+VALUES ($1, $2, $3, $4)
+RETURNING id, name, slug, description, created_at, name_bn
+`
+
+type CreateCategoryParams struct {
+	Name        string
+	NameBn      pgtype.Text
+	Slug        string
+	Description pgtype.Text
+}
+
+func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error) {
+	row := q.db.QueryRow(ctx, createCategory,
+		arg.Name,
+		arg.NameBn,
+		arg.Slug,
+		arg.Description,
+	)
+	var i Category
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.Description,
+		&i.CreatedAt,
+		&i.NameBn,
+	)
+	return i, err
+}
+
 const createNews = `-- name: CreateNews :one
 INSERT INTO news (
-    title, content, thumbnail, slug, 
+    author_id, category_id, title, excerpt, content, thumbnail, slug, 
     published_at, status, meta_title, meta_description
 )
 VALUES (
-    $1, $2, $3, $4, 
-    NOW(), 'published', $1, SUBSTRING($2 FROM 1 FOR 160)
+    $1, $2, $3, $4, $5, $6, $7,
+    NOW(), 'published', $3, $4
 )
-RETURNING id, author_id, category_id, title, slug, content, thumbnail, meta_title, meta_description, keywords, status, views_count, published_at, created_at, updated_at
+RETURNING id, author_id, category_id, title, slug, content, thumbnail, meta_title, meta_description, keywords, status, views_count, published_at, created_at, updated_at, excerpt, is_featured
 `
 
 type CreateNewsParams struct {
-	Title     string
-	Content   string
-	Thumbnail string
-	Slug      string
+	AuthorID   pgtype.UUID
+	CategoryID pgtype.UUID
+	Title      string
+	Excerpt    pgtype.Text
+	Content    string
+	Thumbnail  string
+	Slug       string
 }
 
 func (q *Queries) CreateNews(ctx context.Context, arg CreateNewsParams) (News, error) {
 	row := q.db.QueryRow(ctx, createNews,
+		arg.AuthorID,
+		arg.CategoryID,
 		arg.Title,
+		arg.Excerpt,
 		arg.Content,
 		arg.Thumbnail,
 		arg.Slug,
@@ -78,6 +116,8 @@ func (q *Queries) CreateNews(ctx context.Context, arg CreateNewsParams) (News, e
 		&i.PublishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Excerpt,
+		&i.IsFeatured,
 	)
 	return i, err
 }
@@ -119,14 +159,58 @@ func (q *Queries) DeleteNews(ctx context.Context, id uuid.UUID) (pgconn.CommandT
 	return q.db.Exec(ctx, deleteNews, id)
 }
 
-const getNews = `-- name: GetNews :one
-SELECT id, author_id, category_id, title, slug, content, thumbnail, meta_title, meta_description, keywords, status, views_count, published_at, created_at, updated_at FROM news
-WHERE slug = $1 LIMIT 1
+const getCategoryBySlug = `-- name: GetCategoryBySlug :one
+SELECT id, name, slug, description, created_at, name_bn FROM categories WHERE slug = $1 LIMIT 1
 `
 
-func (q *Queries) GetNews(ctx context.Context, slug string) (News, error) {
+func (q *Queries) GetCategoryBySlug(ctx context.Context, slug string) (Category, error) {
+	row := q.db.QueryRow(ctx, getCategoryBySlug, slug)
+	var i Category
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.Description,
+		&i.CreatedAt,
+		&i.NameBn,
+	)
+	return i, err
+}
+
+const getNews = `-- name: GetNews :one
+SELECT n.id, n.author_id, n.category_id, n.title, n.slug, n.content, n.thumbnail, n.meta_title, n.meta_description, n.keywords, n.status, n.views_count, n.published_at, n.created_at, n.updated_at, n.excerpt, n.is_featured, c.name as category_name, c.slug as category_slug, o.name as author_name
+FROM news n
+LEFT JOIN categories c ON n.category_id = c.id
+LEFT JOIN owners o ON n.author_id = o.id
+WHERE n.slug = $1 LIMIT 1
+`
+
+type GetNewsRow struct {
+	ID              uuid.UUID
+	AuthorID        pgtype.UUID
+	CategoryID      pgtype.UUID
+	Title           string
+	Slug            string
+	Content         string
+	Thumbnail       string
+	MetaTitle       pgtype.Text
+	MetaDescription pgtype.Text
+	Keywords        pgtype.Text
+	Status          string
+	ViewsCount      pgtype.Int8
+	PublishedAt     pgtype.Timestamptz
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+	Excerpt         pgtype.Text
+	IsFeatured      pgtype.Bool
+	CategoryName    pgtype.Text
+	CategorySlug    pgtype.Text
+	AuthorName      pgtype.Text
+}
+
+func (q *Queries) GetNews(ctx context.Context, slug string) (GetNewsRow, error) {
 	row := q.db.QueryRow(ctx, getNews, slug)
-	var i News
+	var i GetNewsRow
 	err := row.Scan(
 		&i.ID,
 		&i.AuthorID,
@@ -143,47 +227,11 @@ func (q *Queries) GetNews(ctx context.Context, slug string) (News, error) {
 		&i.PublishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const getNewsAPI = `-- name: GetNewsAPI :one
-SELECT id, title, content, thumbnail, slug, status, meta_title, meta_description, views_count, published_at, created_at, updated_at
-FROM news
-WHERE slug = $1 LIMIT 1
-`
-
-type GetNewsAPIRow struct {
-	ID              uuid.UUID
-	Title           string
-	Content         string
-	Thumbnail       string
-	Slug            string
-	Status          string
-	MetaTitle       pgtype.Text
-	MetaDescription pgtype.Text
-	ViewsCount      pgtype.Int8
-	PublishedAt     pgtype.Timestamptz
-	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
-}
-
-func (q *Queries) GetNewsAPI(ctx context.Context, slug string) (GetNewsAPIRow, error) {
-	row := q.db.QueryRow(ctx, getNewsAPI, slug)
-	var i GetNewsAPIRow
-	err := row.Scan(
-		&i.ID,
-		&i.Title,
-		&i.Content,
-		&i.Thumbnail,
-		&i.Slug,
-		&i.Status,
-		&i.MetaTitle,
-		&i.MetaDescription,
-		&i.ViewsCount,
-		&i.PublishedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.Excerpt,
+		&i.IsFeatured,
+		&i.CategoryName,
+		&i.CategorySlug,
+		&i.AuthorName,
 	)
 	return i, err
 }
@@ -209,6 +257,27 @@ func (q *Queries) GetOwnerByEmail(ctx context.Context, email string) (Owner, err
 	return i, err
 }
 
+const getOwnerByID = `-- name: GetOwnerByID :one
+SELECT id, name, email, password_hash, role, last_login, created_at, updated_at FROM owners
+WHERE id = $1 LIMIT 1
+`
+
+func (q *Queries) GetOwnerByID(ctx context.Context, id uuid.UUID) (Owner, error) {
+	row := q.db.QueryRow(ctx, getOwnerByID, id)
+	var i Owner
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.LastLogin,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const incrementNewsViews = `-- name: IncrementNewsViews :exec
 UPDATE news 
 SET views_count = views_count + 1 
@@ -220,33 +289,80 @@ func (q *Queries) IncrementNewsViews(ctx context.Context, slug string) error {
 	return err
 }
 
+const listCategories = `-- name: ListCategories :many
+SELECT id, name, slug, description, created_at, name_bn FROM categories ORDER BY name ASC
+`
+
+func (q *Queries) ListCategories(ctx context.Context) ([]Category, error) {
+	rows, err := q.db.Query(ctx, listCategories)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Category
+	for rows.Next() {
+		var i Category
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Slug,
+			&i.Description,
+			&i.CreatedAt,
+			&i.NameBn,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listNews = `-- name: ListNews :many
-SELECT id, title, thumbnail, slug, status, views_count, published_at, created_at, updated_at
-FROM news
-WHERE status = 'published' AND published_at <= NOW()
-ORDER BY published_at DESC
+SELECT n.id, n.title, n.thumbnail, n.slug, n.status, n.views_count, n.published_at, n.created_at, n.updated_at,
+       c.name as category_name, c.slug as category_slug, o.name as author_name
+FROM news n
+LEFT JOIN categories c ON n.category_id = c.id
+LEFT JOIN owners o ON n.author_id = o.id
+WHERE n.status = 'published' AND n.published_at <= NOW()
+AND ($3::uuid IS NULL OR n.category_id = $3)
+ORDER BY 
+    CASE WHEN $4 = 'popular' THEN n.views_count END DESC,
+    CASE WHEN $4 != 'popular' OR $4 IS NULL THEN n.published_at END DESC
 LIMIT $1 OFFSET $2
 `
 
 type ListNewsParams struct {
-	Limit  int32
-	Offset int32
+	Limit   int32
+	Offset  int32
+	Column3 uuid.UUID
+	Column4 interface{}
 }
 
 type ListNewsRow struct {
-	ID          uuid.UUID
-	Title       string
-	Thumbnail   string
-	Slug        string
-	Status      string
-	ViewsCount  pgtype.Int8
-	PublishedAt pgtype.Timestamptz
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
+	ID           uuid.UUID
+	Title        string
+	Thumbnail    string
+	Slug         string
+	Status       string
+	ViewsCount   pgtype.Int8
+	PublishedAt  pgtype.Timestamptz
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+	CategoryName pgtype.Text
+	CategorySlug pgtype.Text
+	AuthorName   pgtype.Text
 }
 
 func (q *Queries) ListNews(ctx context.Context, arg ListNewsParams) ([]ListNewsRow, error) {
-	rows, err := q.db.Query(ctx, listNews, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listNews,
+		arg.Limit,
+		arg.Offset,
+		arg.Column3,
+		arg.Column4,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -264,6 +380,9 @@ func (q *Queries) ListNews(ctx context.Context, arg ListNewsParams) ([]ListNewsR
 			&i.PublishedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.CategoryName,
+			&i.CategorySlug,
+			&i.AuthorName,
 		); err != nil {
 			return nil, err
 		}
@@ -278,24 +397,30 @@ func (q *Queries) ListNews(ctx context.Context, arg ListNewsParams) ([]ListNewsR
 const updateNews = `-- name: UpdateNews :execresult
 UPDATE news
 SET 
-    title = $2, 
-    content = $3, 
-    thumbnail = $4, 
+    category_id = $2,
+    title = $3, 
+    excerpt = $4,
+    content = $5, 
+    thumbnail = $6, 
     updated_at = NOW()
 WHERE id = $1
 `
 
 type UpdateNewsParams struct {
-	ID        uuid.UUID
-	Title     string
-	Content   string
-	Thumbnail string
+	ID         uuid.UUID
+	CategoryID pgtype.UUID
+	Title      string
+	Excerpt    pgtype.Text
+	Content    string
+	Thumbnail  string
 }
 
 func (q *Queries) UpdateNews(ctx context.Context, arg UpdateNewsParams) (pgconn.CommandTag, error) {
 	return q.db.Exec(ctx, updateNews,
 		arg.ID,
+		arg.CategoryID,
 		arg.Title,
+		arg.Excerpt,
 		arg.Content,
 		arg.Thumbnail,
 	)

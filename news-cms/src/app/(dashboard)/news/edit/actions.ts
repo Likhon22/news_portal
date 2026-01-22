@@ -19,20 +19,11 @@ export async function updateNewsAction(id: string, prevState: any, formData: For
     try {
         const token = await getAuthToken();
 
-        // Check if thumbnail is a new file upload or existing string?
-        // In NewsForm, we handle upload separately and put URL in 'thumbnail' input.
-
-        const data = {
-            title: formData.get('title'),
-            category_id: formData.get('category_id'),
-            excerpt: formData.get('excerpt'),
-            content: formData.get('content'),
-            thumbnail: formData.get('thumbnail'),
-            is_featured: formData.get('is_featured') === 'true',
-        };
-
-        await api.put(`/news/${id}`, data, {
-            headers: { Authorization: `Bearer ${token}` },
+        await api.put(`/news/${id}`, formData, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'multipart/form-data',
+            },
         });
 
         revalidatePath('/news');

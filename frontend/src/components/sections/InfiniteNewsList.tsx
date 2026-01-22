@@ -45,7 +45,7 @@ export default function InfiniteNewsList({ category, sort }: InfiniteNewsListPro
         return <div className="py-20 text-center text-red-500 font-bold font-main italic">খবর লোড করতে সমস্যা হয়েছে!</div>;
     }
 
-    const allNews = data?.pages.flatMap((page) => page.newsList) || [];
+    const allNews = data?.pages.flatMap((page) => page.newsList || []) || [];
 
     if (allNews.length === 0) {
         return <div className="py-20 text-center text-gray-400 font-bold font-main italic">কোনো খবর পাওয়া যায়নি!</div>;

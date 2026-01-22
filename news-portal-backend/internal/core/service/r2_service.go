@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -59,5 +60,6 @@ func (s *R2Service) UploadFile(file multipart.File, header *multipart.FileHeader
 		return "", fmt.Errorf("failed to upload to R2: %w", err)
 	}
 
-	return fmt.Sprintf("%s/%s", s.publicURL, filename), nil
+	// Return the direct public R2 URL for maximum performance
+	return fmt.Sprintf("%s/%s", strings.TrimSuffix(s.publicURL, "/"), filename), nil
 }

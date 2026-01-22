@@ -63,14 +63,14 @@ export default function ArticlePage() {
                     />
                 </div>
 
-                <div className="prose prose-xl prose-red max-w-none text-gray-800 leading-[1.8] space-y-8 font-medium">
-                    <p className="font-black text-2xl md:text-3xl mb-10 text-gray-900 border-l-8 border-primary pl-8 py-4 bg-gray-50 leading-tight">
+                <div className="prose prose-xl prose-red max-w-none text-gray-800 leading-[1.8] font-medium">
+                    <p className="font-black text-2xl md:text-3xl mb-10 text-gray-900 border-l-8 border-primary pl-8 py-4 bg-gray-50 leading-tight italic">
                         {article.excerpt}
                     </p>
 
                     {/* Rich Text Content from Backend (Sanitized) */}
                     <div
-                        className="text-lg md:text-xl space-y-6 rich-text"
+                        className="tiptap mb-12"
                         dangerouslySetInnerHTML={{ __html: article.content }}
                     />
                 </div>

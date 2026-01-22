@@ -7,6 +7,10 @@ RETURNING *;
 SELECT * FROM owners
 WHERE email = $1 LIMIT 1;
 
+-- name: GetOwnerByID :one
+SELECT * FROM owners
+WHERE id = $1 LIMIT 1;
+
 -- name: CreateNews :one
 INSERT INTO news (
     author_id, category_id, title, excerpt, content, thumbnail, slug, 

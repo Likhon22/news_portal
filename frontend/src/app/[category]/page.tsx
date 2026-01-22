@@ -1,19 +1,17 @@
 'use client';
 
 import Layout from '@/components/layout/Layout';
-import Card from '@/components/common/Card';
 import { notFound, useParams } from 'next/navigation';
-import { useNews } from '@/hooks/queries/useNews';
 import { useCategories } from '@/hooks/queries/useCategories';
+import InfiniteNewsList from '@/components/sections/InfiniteNewsList';
 
 export default function CategoryPage() {
     const params = useParams();
     const categorySlug = params?.category as string;
 
     const { data: categories, isLoading: isCatsLoading } = useCategories();
-    const { data: newsData, isLoading: isNewsLoading } = useNews({ category: categorySlug });
 
-    if (isCatsLoading || isNewsLoading) {
+    if (isCatsLoading) {
         return <div className="py-20 text-center text-gray-400 font-bold italic">খবর লোড হচ্ছে...</div>;
     }
 
@@ -21,8 +19,6 @@ export default function CategoryPage() {
     if (!category) {
         notFound();
     }
-
-    const categoryArticles = newsData?.newsList || [];
 
     return (
         <Layout>
@@ -33,17 +29,7 @@ export default function CategoryPage() {
                     </h1>
                 </div>
 
-                {categoryArticles.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-16">
-                        {categoryArticles.map((article) => (
-                            <Card key={article.id} article={article} variant="medium" />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="py-20 text-center text-gray-500 font-bold text-xl">
-                        এই বিভাগে বর্তমানে কোনো সংবাদ নেই।
-                    </div>
-                )}
+                <InfiniteNewsList category={categorySlug} />
             </div>
         </Layout>
     );

@@ -14,6 +14,9 @@ export const useInfiniteNews = (params?: { limit?: number; category?: string; so
         queryFn: ({ pageParam = 1 }) => newsService.getAll({ ...params, page: pageParam as number }),
         initialPageParam: 1,
         getNextPageParam: (lastPage, allPages) => {
+            if (!lastPage || !lastPage.newsList) {
+                return undefined;
+            }
             // If the current page has fewer items than the limit, assume there are no more pages
             const limit = params?.limit || 10;
             if (lastPage.newsList.length < limit) {

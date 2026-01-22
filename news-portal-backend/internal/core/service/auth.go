@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
+	"news-portal-backend/internal/core/domain"
 	"news-portal-backend/internal/core/port"
 )
 
@@ -44,4 +46,40 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 	})
 
 	return token.SignedString([]byte(s.jwtSecret))
+}
+
+func (s *AuthService) Register(ctx context.Context, name, email, password string) (*domain.Owner, error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repo.CreateOwner(ctx, name, email, string(hashedPassword))
+}
+
+func (s *AuthService) ChangePassword(ctx context.Context, id uuid.UUID, oldPassword, newPassword string) error {
+	owner, err := s.repo.GetOwnerByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if owner == nil {
+		return errors.New("user not found")
+	}
+
+	// Verify old password
+	err = bcrypt.CompareHashAndPassword([]byte(owner.Password), []byte(oldPassword))
+	if err != nil {
+		return errors.New("invalid old password")
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	return s.repo.UpdateOwnerPassword(ctx, id, string(hashedPassword))
+}
+
+func (s *AuthService) ListUsers(ctx context.Context) ([]*domain.Owner, error) {
+	return s.repo.ListOwners(ctx)
 }

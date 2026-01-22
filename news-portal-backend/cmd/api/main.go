@@ -113,8 +113,7 @@ func main() {
 	// Handlers
 	authHandler := handler.NewAuthHandler(authService)
 	categoryHandler := handler.NewCategoryHandler(categoryService)
-	newsHandler := handler.NewNewsHandler(newsService)
-	fileHandler := handler.NewFileHandler(fileService)
+	newsHandler := handler.NewNewsHandler(newsService, fileService)
 
 	// Stats
 	statsService := service.NewStatsService(store, store, store)
@@ -150,10 +149,14 @@ func main() {
 
 		r.Group(func(r chi.Router) {
 			r.Use(handler.AuthMiddleware(jwtSecret))
-			r.Post("/upload", fileHandler.Upload)
 			r.Post("/news", newsHandler.CreateNews)
 			r.Put("/news/{id}", newsHandler.UpdateNews)
 			r.Delete("/news/{id}", newsHandler.DeleteNews)
+
+			// Admin user management
+			r.Get("/users", authHandler.ListUsers)
+			r.Post("/users", authHandler.Register)
+			r.Post("/users/change-password", authHandler.ChangePassword)
 		})
 	})
 

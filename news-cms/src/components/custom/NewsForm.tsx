@@ -17,10 +17,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { uploadFileAction } from '@/app/(dashboard)/news/create/actions';
 import { TipTapEditor } from '@/components/custom/TipTapEditor';
 import { Category, News } from '@/types';
-import { useActionState } from 'react';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import Image from 'next/image';
@@ -31,8 +29,7 @@ const formSchema = z.object({
     excerpt: z.string().min(10, 'Excerpt must be at least 10 characters'),
     content: z.string().min(20, 'Content must be at least 20 characters'),
     is_featured: z.boolean(),
-    // Thumbnail is handled separately via upload but we validate it exists
-    thumbnail: z.string().min(1, 'Thumbnail is required'),
+    thumbnail: z.any().refine((val) => val && (val instanceof File || typeof val === 'string' && val.length > 0), 'Thumbnail is required'),
 });
 
 interface NewsFormProps {
@@ -43,10 +40,8 @@ interface NewsFormProps {
 
 export function NewsForm({ categories, initialData, action: serverAction }: NewsFormProps) {
     const [uploading, setUploading] = useState(false);
+    const [isPending, setIsPending] = useState(false);
     const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(initialData?.thumbnail || null);
-
-    // Server Action State
-    const [state, formAction, isPending] = useActionState(serverAction, null);
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -60,42 +55,59 @@ export function NewsForm({ categories, initialData, action: serverAction }: News
         },
     });
 
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        setUploading(true);
-        const formData = new FormData();
-        formData.append('file', file);
+        // Instant local preview
+        const localUrl = URL.createObjectURL(file);
+        setThumbnailPreview(localUrl);
 
-        const result = await uploadFileAction(formData);
+        // Store the file object in the form state
+        form.setValue('thumbnail', file as any);
+        toast.success('Image selected');
+    };
 
-        setUploading(false);
+    const onSubmit = async (values: z.infer<typeof formSchema>) => {
+        try {
+            setIsPending(true);
+            const formData = new FormData();
 
-        if (result.error) {
-            toast.error(result.error);
-        } else if (result.url) {
-            form.setValue('thumbnail', result.url);
-            setThumbnailPreview(result.url);
-            toast.success('Image uploaded successfully');
+            // Append all fields to FormData
+            formData.append('title', values.title);
+            formData.append('category_id', values.category_id);
+            formData.append('excerpt', values.excerpt);
+            formData.append('content', values.content);
+            formData.append('is_featured', String(values.is_featured));
+
+            // Thumbnail can be a File (new) or string (existing)
+            if ((values.thumbnail as any) instanceof File) {
+                formData.append('thumbnail', values.thumbnail);
+            } else if (typeof values.thumbnail === 'string') {
+                formData.append('thumbnail', values.thumbnail);
+            }
+
+            const result = await serverAction(null, formData);
+
+            if (result?.error) {
+                toast.error(result.error);
+            } else {
+                toast.success(initialData ? 'News updated successfully' : 'News published successfully');
+                if (!initialData) {
+                    window.location.href = '/news';
+                }
+            }
+        } catch (error) {
+            toast.error('Submission failed. Please check your network.');
+        } finally {
+            setIsPending(false);
         }
     };
 
     return (
         <Form {...form}>
-            <form action={formAction} onSubmit={(evt) => {
-                evt.preventDefault();
-                form.handleSubmit(() => {
-                    // Create FormData manually to pass to server action because we need to combine hook form data
-                    const formData = new FormData();
-                    const values = form.getValues();
-                    Object.entries(values).forEach(([key, value]) => {
-                        formData.append(key, String(value));
-                    });
-                    formAction(formData);
-                })(evt);
-            }} className="space-y-8 max-w-3xl">
-
+            {/* preventDefault is handled by handleSubmit */}
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 max-w-3xl">
                 <FormField
                     control={form.control}
                     name="title"
@@ -172,16 +184,27 @@ export function NewsForm({ categories, initialData, action: serverAction }: News
                                         type="file"
                                         accept="image/*"
                                         onChange={handleFileChange}
-                                        disabled={uploading}
+                                        disabled={uploading || isPending}
                                     />
-                                    {uploading && <Loader2 className="animate-spin" />}
+                                    {uploading && (
+                                        <div className="flex items-center text-sm text-primary animate-pulse">
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Uploading to R2...
+                                        </div>
+                                    )}
                                 </div>
                             </FormControl>
                             <input type="hidden" {...field} />
                             <FormMessage />
                             {thumbnailPreview && (
-                                <div className="mt-2 relative h-40 w-full max-w-xs border rounded overflow-hidden">
-                                    <Image src={thumbnailPreview} alt="Preview" fill className="object-cover" />
+                                <div className="mt-2 relative h-40 w-full max-w-xs border rounded overflow-hidden bg-muted">
+                                    <Image
+                                        src={thumbnailPreview}
+                                        alt="Preview"
+                                        fill
+                                        className="object-cover"
+                                        unoptimized // Allow local blob preview
+                                    />
                                 </div>
                             )}
                         </FormItem>
@@ -231,8 +254,10 @@ export function NewsForm({ categories, initialData, action: serverAction }: News
                         {isPending ? (
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                {initialData ? 'Updating...' : 'Publish News'}
+                                {initialData ? 'Updating...' : 'Publishing...'}
                             </>
+                        ) : uploading ? (
+                            'Waiting for Image...'
                         ) : (
                             initialData ? 'Update News' : 'Publish News'
                         )}

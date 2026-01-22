@@ -65,8 +65,57 @@ func (a *Adapter) GetOwnerByEmail(ctx context.Context, email string) (*domain.Ow
 	}, nil
 }
 
+func (a *Adapter) GetOwnerByID(ctx context.Context, id uuid.UUID) (*domain.Owner, error) {
+	owner, err := a.q.GetOwnerByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &domain.Owner{
+		ID:        owner.ID,
+		Name:      owner.Name,
+		Email:     owner.Email,
+		Password:  owner.PasswordHash,
+		Role:      owner.Role,
+		CreatedAt: owner.CreatedAt.Time,
+	}, nil
+}
+
 func (a *Adapter) CountOwners(ctx context.Context) (int64, error) {
 	return a.q.CountOwners(ctx)
+}
+
+func (a *Adapter) ListOwners(ctx context.Context) ([]*domain.Owner, error) {
+	query := `SELECT id, name, email, role, created_at FROM owners ORDER BY created_at DESC`
+	rows, err := a.db.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var owners []*domain.Owner
+	for rows.Next() {
+		o := &domain.Owner{}
+		if err := rows.Scan(&o.ID, &o.Name, &o.Email, &o.Role, &o.CreatedAt); err != nil {
+			return nil, err
+		}
+		owners = append(owners, o)
+	}
+	return owners, nil
+}
+
+func (a *Adapter) UpdateOwnerPassword(ctx context.Context, id uuid.UUID, passwordHash string) error {
+	query := `UPDATE owners SET password_hash = $2, updated_at = NOW() WHERE id = $1`
+	tag, err := a.db.Exec(ctx, query, id, passwordHash)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
 }
 
 // CategoryRepository implementation

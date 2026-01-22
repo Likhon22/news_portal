@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -20,10 +21,16 @@ type NewsService struct {
 }
 
 func NewNewsService(repo port.NewsRepository, categoryRepo port.CategoryRepository) *NewsService {
+	p := bluemonday.UGCPolicy()
+	// Allow TipTap alignment classes and the tiptap class itself
+	p.AllowAttrs("class").Matching(regexp.MustCompile(`^(text-align-(left|center|right|justify)|tiptap)$`)).OnElements("p", "h1", "h2", "h3", "h4", "h5", "h6", "div", "span")
+	// Allow inline styles for colors
+	p.AllowAttrs("style").OnElements("span", "p", "h1", "h2", "h3", "h4", "h5", "h6")
+
 	return &NewsService{
 		repo:         repo,
 		categoryRepo: categoryRepo,
-		p:            bluemonday.UGCPolicy(), // Good default for user-generated content
+		p:            p,
 	}
 }
 

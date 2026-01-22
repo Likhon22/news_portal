@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Newspaper, Layers, LogOut } from 'lucide-react';
+import { LayoutDashboard, Newspaper, Layers, Users, LogOut } from 'lucide-react';
 
 const sidebarItems = [
     {
@@ -20,6 +20,11 @@ const sidebarItems = [
         title: 'Categories',
         href: '/categories',
         icon: Layers,
+    },
+    {
+        title: 'Users',
+        href: '/users',
+        icon: Users,
     },
 ];
 

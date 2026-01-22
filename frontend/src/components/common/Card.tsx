@@ -1,13 +1,14 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { News } from '@/types/news';
+import React, { memo } from 'react';
 
 interface CardProps {
     article: News;
     variant?: 'large' | 'medium' | 'small' | 'list' | 'hero-side';
 }
 
-export default function Card({ article, variant = 'medium' }: CardProps) {
+const Card = memo(({ article, variant = 'medium' }: CardProps) => {
     const isLarge = variant === 'large';
     const isList = variant === 'list';
     const isSmall = variant === 'small';
@@ -63,4 +64,8 @@ export default function Card({ article, variant = 'medium' }: CardProps) {
             </div>
         </article>
     );
-}
+});
+
+Card.displayName = 'Card';
+
+export default Card;

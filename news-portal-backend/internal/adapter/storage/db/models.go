@@ -15,6 +15,7 @@ type Category struct {
 	Slug        string
 	Description pgtype.Text
 	CreatedAt   pgtype.Timestamptz
+	NameBn      pgtype.Text
 }
 
 type News struct {
@@ -33,6 +34,8 @@ type News struct {
 	PublishedAt     pgtype.Timestamptz
 	CreatedAt       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
+	Excerpt         pgtype.Text
+	IsFeatured      pgtype.Bool
 }
 
 type Owner struct {

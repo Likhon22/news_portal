@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -42,35 +43,120 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"token": token})
 }
 
-// News Handler
-
-type NewsHandler struct {
-	svc port.NewsService
-}
-
-func NewNewsHandler(svc port.NewsService) *NewsHandler {
-	return &NewsHandler{svc: svc}
-}
-
-func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		CategoryID uuid.UUID `json:"category_id"`
-		Title      string    `json:"title"`
-		Excerpt    string    `json:"excerpt"`
-		Content    string    `json:"content"`
-		Thumbnail  string    `json:"thumbnail"`
-		IsFeatured bool      `json:"is_featured"`
+		Name     string `json:"name"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if req.Title == "" || req.Content == "" {
+
+	if req.Email == "" || req.Password == "" || req.Name == "" {
+		http.Error(w, "Name, Email and Password are required", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.svc.Register(r.Context(), req.Name, req.Email, req.Password)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
+}
+
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if req.OldPassword == "" || req.NewPassword == "" {
+		http.Error(w, "Old and new passwords are required", http.StatusBadRequest)
+		return
+	}
+
+	// Get user_id from context (set by AuthMiddleware)
+	userIDStr, ok := r.Context().Value("user_id").(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusUnauthorized)
+		return
+	}
+
+	err = h.svc.ChangePassword(r.Context(), userID, req.OldPassword, req.NewPassword)
+	if err != nil {
+		if err.Error() == "invalid old password" {
+			http.Error(w, "Invalid old password", http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Password updated"})
+}
+
+func (h *AuthHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := h.svc.ListUsers(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(users)
+}
+
+// News Handler
+
+type NewsHandler struct {
+	svc     port.NewsService
+	fileSvc port.FileService
+}
+
+func NewNewsHandler(svc port.NewsService, fileSvc port.FileService) *NewsHandler {
+	return &NewsHandler{svc: svc, fileSvc: fileSvc}
+}
+
+func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
+	// Parse multipart form
+	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	title := r.FormValue("title")
+	categoryIDStr := r.FormValue("category_id")
+	excerpt := r.FormValue("excerpt")
+	content := r.FormValue("content")
+	isFeatured := r.FormValue("is_featured") == "true"
+
+	if title == "" || content == "" {
 		http.Error(w, "Title and Content are required", http.StatusBadRequest)
 		return
 	}
 
-	// Get author_id from context (set by AuthMiddleware)
+	categoryID, err := uuid.Parse(categoryIDStr)
+	if err != nil {
+		http.Error(w, "Invalid Category ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get author_id from context
 	userIDStr, ok := r.Context().Value("user_id").(string)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -82,7 +168,26 @@ func (h *NewsHandler) CreateNews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	news, err := h.svc.CreateNews(r.Context(), authorID, req.CategoryID, req.Title, req.Excerpt, req.Content, req.Thumbnail, req.IsFeatured)
+	// Handle Image Upload if present
+	var thumbnail string
+	file, header, err := r.FormFile("thumbnail")
+	if err == nil {
+		defer file.Close()
+		// Validate file type
+		contentType := header.Header.Get("Content-Type")
+		if !strings.HasPrefix(contentType, "image/") {
+			http.Error(w, "Only image files are allowed", http.StatusBadRequest)
+			return
+		}
+
+		thumbnail, err = h.fileSvc.UploadFile(file, header)
+		if err != nil {
+			http.Error(w, "Failed to upload image: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	news, err := h.svc.CreateNews(r.Context(), authorID, categoryID, title, excerpt, content, thumbnail, isFeatured)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -103,24 +208,48 @@ func (h *NewsHandler) UpdateNews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		CategoryID uuid.UUID `json:"category_id"`
-		Title      string    `json:"title"`
-		Excerpt    string    `json:"excerpt"`
-		Content    string    `json:"content"`
-		Thumbnail  string    `json:"thumbnail"`
-		IsFeatured bool      `json:"is_featured"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
-	if req.Title == "" || req.Content == "" {
+
+	title := r.FormValue("title")
+	categoryIDStr := r.FormValue("category_id")
+	excerpt := r.FormValue("excerpt")
+	content := r.FormValue("content")
+	isFeatured := r.FormValue("is_featured") == "true"
+	existingThumbnail := r.FormValue("thumbnail") // Keep existing if no new one
+
+	if title == "" || content == "" {
 		http.Error(w, "Title and Content are required", http.StatusBadRequest)
 		return
 	}
 
-	if err := h.svc.UpdateNews(r.Context(), id, req.CategoryID, req.Title, req.Excerpt, req.Content, req.Thumbnail, req.IsFeatured); err != nil {
+	categoryID, err := uuid.Parse(categoryIDStr)
+	if err != nil {
+		http.Error(w, "Invalid Category ID", http.StatusBadRequest)
+		return
+	}
+
+	// Handle Image Upload if present
+	thumbnail := existingThumbnail
+	file, header, err := r.FormFile("thumbnail")
+	if err == nil {
+		defer file.Close()
+		contentType := header.Header.Get("Content-Type")
+		if !strings.HasPrefix(contentType, "image/") {
+			http.Error(w, "Only image files are allowed", http.StatusBadRequest)
+			return
+		}
+
+		thumbnail, err = h.fileSvc.UploadFile(file, header)
+		if err != nil {
+			http.Error(w, "Failed to upload image: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if err := h.svc.UpdateNews(r.Context(), id, categoryID, title, excerpt, content, thumbnail, isFeatured); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			http.Error(w, "News not found", http.StatusNotFound)
 			return
@@ -244,37 +373,6 @@ func (h *CategoryHandler) ListCategories(w http.ResponseWriter, r *http.Request)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(categories)
-}
-
-// File Handler
-
-type FileHandler struct {
-	svc port.FileService
-}
-
-func NewFileHandler(svc port.FileService) *FileHandler {
-	return &FileHandler{svc: svc}
-}
-
-func (h *FileHandler) Upload(w http.ResponseWriter, r *http.Request) {
-	// ParseMultipartForm is called automatically by FormFile if needed, but better call it.
-	r.ParseMultipartForm(10 << 20) // 10 MB
-
-	file, header, err := r.FormFile("file")
-	if err != nil {
-		http.Error(w, "Invalid file", http.StatusBadRequest)
-		return
-	}
-	defer file.Close()
-
-	url, err := h.svc.UploadFile(file, header)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"url": url})
 }
 
 // Stats Handler
