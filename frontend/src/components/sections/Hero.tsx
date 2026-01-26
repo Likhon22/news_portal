@@ -16,10 +16,10 @@ export default function Hero({ featured: mainArticle, latest, isLoading }: HeroP
         return <div className="py-20 text-center text-gray-400 font-bold italic">খবর লোড হচ্ছে...</div>;
     }
 
-    // Hero uses first 2 for secondary (under main) and next 4 for side list
+    // Hero uses first 3 for side list (right) and next 2 for secondary (under main)
     // latest list from props is already filtered by backend
-    const secondaryArticles = latest.slice(0, 2);
-    const sideArticles = latest.slice(2, 6);
+    const sideArticles = latest.slice(0, 3);
+    const secondaryArticles = latest.slice(3, 5);
 
     return (
         <section className="py-8 md:py-12">

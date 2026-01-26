@@ -30,7 +30,7 @@ COPY --from=builder /app/.env.example ./.env
 COPY --from=builder /app/migrations ./migrations
 
 # Expose the API port
-EXPOSE 8080
+EXPOSE 8085
 
 # Command to run the application
 CMD ["./main"]

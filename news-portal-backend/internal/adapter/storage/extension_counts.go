@@ -4,11 +4,25 @@ import (
 	"context"
 
 	"news-portal-backend/internal/core/port"
+
+	"github.com/google/uuid"
 )
 
-func (a *Adapter) CountNews(ctx context.Context) (int64, error) {
+func (a *Adapter) CountNews(ctx context.Context, categoryID *uuid.UUID, isFeatured *bool, search string) (int64, error) {
+	var searchPtr *string
+	if search != "" {
+		pattern := "%" + search + "%"
+		searchPtr = &pattern
+	}
+
+	query := `SELECT COUNT(*) FROM news n
+	          WHERE n.status = 'published' AND n.published_at <= NOW()
+	          AND ($1::uuid IS NULL OR n.category_id = $1)
+	          AND ($2::boolean IS NULL OR n.is_featured = $2)
+	          AND ($3::text IS NULL OR n.title ILIKE $3)`
+
 	var count int64
-	err := a.db.QueryRow(ctx, "SELECT COUNT(*) FROM news").Scan(&count)
+	err := a.db.QueryRow(ctx, query, categoryID, isFeatured, searchPtr).Scan(&count)
 	return count, err
 }
 
@@ -53,7 +67,7 @@ func (a *Adapter) GetCategoryViewStats(ctx context.Context) ([]port.CategoryView
 
 func (a *Adapter) GetMonthlyTopNews(ctx context.Context, limit int) ([]port.NewsViewStat, error) {
 	query := `
-		SELECT title, views_count
+		SELECT id, title, views_count
 		FROM news
 		WHERE published_at >= NOW() - INTERVAL '30 days'
 		ORDER BY views_count DESC
@@ -68,7 +82,7 @@ func (a *Adapter) GetMonthlyTopNews(ctx context.Context, limit int) ([]port.News
 	var stats []port.NewsViewStat
 	for rows.Next() {
 		var s port.NewsViewStat
-		if err := rows.Scan(&s.Title, &s.Views); err != nil {
+		if err := rows.Scan(&s.ID, &s.Title, &s.Views); err != nil {
 			return nil, err
 		}
 		stats = append(stats, s)

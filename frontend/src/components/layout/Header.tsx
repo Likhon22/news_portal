@@ -1,13 +1,16 @@
-'use client';
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCategories } from '@/hooks/queries/useCategories';
 import { FacebookIcon, TwitterIcon, YouTubeIcon, SearchIcon, CloseIcon } from '@/components/common/Icons';
 
 export default function Header() {
+    const router = useRouter();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const [isSticky, setIsSticky] = useState(false);
+    const searchInputRef = useRef<HTMLInputElement>(null);
     const { data: categories, isLoading, error } = useCategories();
 
     useEffect(() => {
@@ -20,6 +23,29 @@ export default function Header() {
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
+
+    useEffect(() => {
+        if (isSearchOpen && searchInputRef.current) {
+            searchInputRef.current.focus();
+        }
+    }, [isSearchOpen]);
+
+    const handleSearch = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (searchQuery.trim()) {
+            router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+            setIsSearchOpen(false);
+            setSearchQuery('');
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleSearch();
+        } else if (e.key === 'Escape') {
+            setIsSearchOpen(false);
+        }
+    };
 
     const renderNavItems = () => {
         if (isLoading) return <div className="text-gray-400 text-sm italic">লোড হচ্ছে...</div>;
@@ -59,12 +85,6 @@ export default function Header() {
 
     return (
         <>
-            {/* 
-                FINAL DESKTOP HEADER LOGIC:
-                - Static State: Full Branding (100px) + Navigation (60px).
-                - Sticky State: Header translates UP by 100px, so Branding is hidden and NAV is fixed at top.
-                - Search Icon stays in the branding row ONLY (one place, no animation).
-            */}
             <header
                 className={`w-full bg-white z-[150] border-b border-gray-100 transition-transform duration-500 fixed top-0 left-0
                 ${isSticky ? 'md:-translate-y-[100px] shadow-sm' : 'translate-y-0'}`}
@@ -86,7 +106,7 @@ export default function Header() {
                             </Link>
                         </div>
                         <div className="w-1/4 flex justify-end">
-                            <button className="text-gray-400 p-2">
+                            <button className="text-gray-400 p-2" onClick={() => setIsSearchOpen(true)}>
                                 <SearchIcon className="w-6 h-6" />
                             </button>
                         </div>
@@ -94,7 +114,7 @@ export default function Header() {
 
                     {/* --- DESKTOP HEADER --- */}
                     <div className="hidden md:flex flex-col">
-                        {/* Branding Row - 100px (Search Icon fixed here) */}
+                        {/* Branding Row - 100px */}
                         <div className="flex items-center justify-between h-[100px]">
                             <div className="w-1/3 flex items-center gap-6">
                                 <Link href="#" className="p-1 text-gray-400 hover:text-primary transition-all"><FacebookIcon className="w-5 h-5" /></Link>
@@ -112,13 +132,13 @@ export default function Header() {
                                 <div className="text-right">
                                     <p className="text-sm font-black uppercase tracking-[0.2em] text-gray-600">মঙ্গলবার, ২০ জানুয়ারি ২০২৬</p>
                                 </div>
-                                <button className="hover:text-primary transition-all">
+                                <button className="hover:text-primary transition-all" onClick={() => setIsSearchOpen(true)}>
                                     <SearchIcon className="w-7 h-7" />
                                 </button>
                             </div>
                         </div>
 
-                        {/* Category Navigation - Stays fixed at top when header translates up */}
+                        {/* Category Navigation */}
                         <div className="flex items-center h-[60px] border-t border-gray-50">
                             <nav className="flex items-center justify-center w-full">
                                 {renderNavItems()}
@@ -130,6 +150,36 @@ export default function Header() {
 
             {/* Spacer */}
             <div className="h-[56px] md:h-[160px]"></div>
+
+            {/* Search Overlay */}
+            {isSearchOpen && (
+                <div className="fixed inset-0 bg-white z-[250] flex flex-col p-6 animate-in fade-in slide-in-from-top duration-300">
+                    <div className="container flex flex-col h-full max-w-5xl mx-auto">
+                        <div className="flex justify-end p-4">
+                            <button onClick={() => setIsSearchOpen(false)} className="text-gray-900 transition-transform hover:scale-110">
+                                <CloseIcon className="w-10 h-10 md:w-16 md:h-16" />
+                            </button>
+                        </div>
+                        <div className="flex-1 flex flex-col justify-center items-center pb-20">
+                            <div className="w-full relative">
+                                <input
+                                    ref={searchInputRef}
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder="খবর খুঁজুন..."
+                                    className="w-full text-4xl md:text-7xl font-black bg-transparent border-b-8 border-primary py-8 text-primary focus:outline-none placeholder:text-gray-100 italic tracking-tighter"
+                                />
+                                <div className="mt-8 flex items-center justify-between text-gray-400 uppercase tracking-[0.3em] font-black text-xs md:text-sm">
+                                    <span>টাইপ করে এন্টার চাপুন</span>
+                                    <span>সার্চ ইঞ্জিন ১.০</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Menu Overlay */}
             {isMenuOpen && (

@@ -17,10 +17,9 @@ export async function createNewsAction(prevState: any, formData: FormData) {
         });
 
         revalidatePath('/news');
+        return { success: true };
     } catch (error: any) {
         console.error('Create news error:', error.response?.data || error.message);
         return { error: error.response?.data?.message || 'Failed to create news' };
     }
-
-    redirect('/news');
 }

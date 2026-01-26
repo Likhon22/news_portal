@@ -82,8 +82,7 @@ func (s *NewsService) GetNewsBySlug(ctx context.Context, slug string) (*domain.N
 	}
 	return news, nil
 }
-
-func (s *NewsService) ListNews(ctx context.Context, page, limit int32, categorySlug string, sortBy string, isFeatured *bool) ([]*domain.News, error) {
+func (s *NewsService) ListNews(ctx context.Context, page, limit int32, categorySlug string, sortBy string, isFeatured *bool, search string) ([]*domain.News, int64, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -96,14 +95,25 @@ func (s *NewsService) ListNews(ctx context.Context, page, limit int32, categoryS
 	if categorySlug != "" {
 		cat, err := s.categoryRepo.GetCategoryBySlug(ctx, categorySlug)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if cat != nil {
 			categoryID = &cat.ID
 		}
 	}
 
-	return s.repo.ListNews(ctx, limit, offset, categoryID, sortBy, isFeatured)
+	news, err := s.repo.ListNews(ctx, limit, offset, categoryID, sortBy, isFeatured, search)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Get total count with filters applied
+	total, err := s.repo.CountNews(ctx, categoryID, isFeatured, search)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return news, total, nil
 }
 
 func (s *NewsService) CheckSlug(ctx context.Context, slug string) (bool, error) {
@@ -113,7 +123,7 @@ func (s *NewsService) CheckSlug(ctx context.Context, slug string) (bool, error) 
 func (s *NewsService) GetHomepageData(ctx context.Context) (*port.HomepageData, error) {
 	// 1. Fetch Featured News (Limit 1)
 	isFeatured := true
-	featuredList, err := s.repo.ListNews(ctx, 1, 0, nil, "latest", &isFeatured)
+	featuredList, err := s.repo.ListNews(ctx, 1, 0, nil, "latest", &isFeatured, "")
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +136,7 @@ func (s *NewsService) GetHomepageData(ctx context.Context) (*port.HomepageData, 
 	}
 
 	// 2. Fetch Latest News (Limit 21 - fetching one extra in case we filter out featured)
-	latestList, err := s.repo.ListNews(ctx, 21, 0, nil, "latest", nil)
+	latestList, err := s.repo.ListNews(ctx, 21, 0, nil, "latest", nil, "")
 	if err != nil {
 		return nil, err
 	}
@@ -144,35 +154,38 @@ func (s *NewsService) GetHomepageData(ctx context.Context) (*port.HomepageData, 
 		}
 	}
 
-	// 3. Fetch Popular News (Limit 6 - fetching one extra for filter)
-	popularList, err := s.repo.ListNews(ctx, 6, 0, nil, "popular", nil)
+	// 3. Fetch Popular News (Limit 5)
+	popularList, err := s.repo.ListNews(ctx, 5, 0, nil, "popular", nil, "")
 	if err != nil {
 		return nil, err
-	}
-
-	// Filter out Featured from Popular
-	var popular []*domain.News
-	count = 0
-	for _, news := range popularList {
-		if news.ID != featuredID {
-			popular = append(popular, news)
-			count++
-			if count >= 5 { // We want 5 popular news
-				break
-			}
-		}
 	}
 
 	return &port.HomepageData{
 		Featured: featured,
 		Latest:   latest,
-		Popular:  popular,
+		Popular:  popularList,
 	}, nil
 }
 
 func generateSlug(title string) string {
+	// Convert to lowercase
 	slug := strings.ToLower(title)
+
+	// Remove all special characters except alphanumeric and spaces
+	// This regex keeps letters (including unicode), numbers, and spaces
+	reg := regexp.MustCompile(`[^a-z0-9\p{L}\s-]+`)
+	slug = reg.ReplaceAllString(slug, "")
+
+	// Replace spaces with hyphens
 	slug = strings.ReplaceAll(slug, " ", "-")
+
+	// Replace multiple consecutive hyphens with single hyphen
+	multiHyphen := regexp.MustCompile(`-+`)
+	slug = multiHyphen.ReplaceAllString(slug, "-")
+
+	// Trim leading and trailing hyphens
+	slug = strings.Trim(slug, "-")
+
 	return fmt.Sprintf("%s-%d", slug, time.Now().Unix())
 }
 
@@ -184,6 +197,33 @@ type CategoryService struct {
 
 func NewCategoryService(repo port.CategoryRepository) *CategoryService {
 	return &CategoryService{repo: repo}
+}
+
+func (s *CategoryService) CreateCategory(ctx context.Context, name, nameBN, description string) (*domain.Category, error) {
+	slug := generateSlug(name)
+	category := &domain.Category{
+		Name:        name,
+		NameBN:      &nameBN,
+		Slug:        slug,
+		Description: &description,
+	}
+	return s.repo.CreateCategory(ctx, category)
+}
+
+func (s *CategoryService) UpdateCategory(ctx context.Context, id uuid.UUID, name, nameBN, description string) error {
+	slug := generateSlug(name)
+	category := &domain.Category{
+		ID:          id,
+		Name:        name,
+		NameBN:      &nameBN,
+		Slug:        slug,
+		Description: &description,
+	}
+	return s.repo.UpdateCategory(ctx, category)
+}
+
+func (s *CategoryService) DeleteCategory(ctx context.Context, id uuid.UUID) error {
+	return s.repo.DeleteCategory(ctx, id)
 }
 
 func (s *CategoryService) ListCategories(ctx context.Context) ([]*domain.Category, error) {

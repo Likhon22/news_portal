@@ -27,10 +27,9 @@ export async function updateNewsAction(id: string, prevState: any, formData: For
         });
 
         revalidatePath('/news');
+        return { success: true };
     } catch (error: any) {
         console.error('Update news error:', error.response?.data || error.message);
         return { error: error.response?.data?.message || 'Failed to update news' };
     }
-
-    redirect('/news');
 }

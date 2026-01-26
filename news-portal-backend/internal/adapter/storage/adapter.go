@@ -148,6 +148,42 @@ func (a *Adapter) ListCategories(ctx context.Context) ([]*domain.Category, error
 	return categories, nil
 }
 
+func (a *Adapter) UpdateCategory(ctx context.Context, category *domain.Category) error {
+	query := `UPDATE categories SET name = $2, name_bn = $3, slug = $4, description = $5 WHERE id = $1`
+	tag, err := a.db.Exec(ctx, query, category.ID, category.Name, category.NameBN, category.Slug, category.Description)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+func (a *Adapter) DeleteCategory(ctx context.Context, id uuid.UUID) error {
+	tag, err := a.db.Exec(ctx, "DELETE FROM categories WHERE id = $1", id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+func (a *Adapter) GetCategoryByID(ctx context.Context, id uuid.UUID) (*domain.Category, error) {
+	query := `SELECT id, name, name_bn, slug, description, created_at FROM categories WHERE id = $1 LIMIT 1`
+	c := &domain.Category{}
+	err := a.db.QueryRow(ctx, query, id).Scan(&c.ID, &c.Name, &c.NameBN, &c.Slug, &c.Description, &c.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return c, nil
+}
+
 func (a *Adapter) GetCategoryBySlug(ctx context.Context, slug string) (*domain.Category, error) {
 	query := `SELECT id, name, name_bn, slug, description, created_at FROM categories WHERE slug = $1 LIMIT 1`
 	c := &domain.Category{}
@@ -256,10 +292,23 @@ func (a *Adapter) GetNewsBySlug(ctx context.Context, slug string) (*domain.News,
 	return n, nil
 }
 
-func (a *Adapter) ListNews(ctx context.Context, limit, offset int32, categoryID *uuid.UUID, sortBy string, isFeatured *bool) ([]*domain.News, error) {
+func (a *Adapter) ListNews(ctx context.Context, limit, offset int32, categoryID *uuid.UUID, sortBy string, isFeatured *bool, search string) ([]*domain.News, error) {
 	orderBy := "n.published_at DESC"
-	if sortBy == "popular" {
+	switch sortBy {
+	case "popular", "views_desc":
 		orderBy = "n.views_count DESC, n.published_at DESC"
+	case "views_asc":
+		orderBy = "n.views_count ASC, n.published_at DESC"
+	case "oldest":
+		orderBy = "n.published_at ASC"
+	case "latest":
+		orderBy = "n.published_at DESC"
+	}
+
+	var searchPtr *string
+	if search != "" {
+		pattern := "%" + search + "%"
+		searchPtr = &pattern
 	}
 
 	query := `SELECT n.id, n.title, n.thumbnail, n.slug, n.status, n.is_featured, n.views_count, n.published_at, n.created_at, n.updated_at,
@@ -270,9 +319,10 @@ func (a *Adapter) ListNews(ctx context.Context, limit, offset int32, categoryID 
 	          WHERE n.status = 'published' AND n.published_at <= NOW()
 	          AND ($3::uuid IS NULL OR n.category_id = $3)
 	          AND ($4::boolean IS NULL OR n.is_featured = $4)
+	          AND ($5::text IS NULL OR n.title ILIKE $5)
 	          ORDER BY ` + orderBy + ` LIMIT $1 OFFSET $2`
 
-	rows, err := a.db.Query(ctx, query, limit, offset, categoryID, isFeatured)
+	rows, err := a.db.Query(ctx, query, limit, offset, categoryID, isFeatured, searchPtr)
 	if err != nil {
 		return nil, err
 	}

@@ -2,13 +2,14 @@ import { getNewsAction } from './actions';
 import { NewsTable } from '@/components/custom/NewsTable';
 
 export default async function NewsPage(props: {
-    searchParams: Promise<{ page?: string }>;
+    searchParams: Promise<{ page?: string; sort?: string }>;
 }) {
     const searchParams = await props.searchParams;
     const currentPage = Number(searchParams.page) || 1;
+    const currentSort = searchParams.sort || 'latest';
     const limit = 10;
 
-    const result = await getNewsAction(currentPage, limit);
+    const result = await getNewsAction(currentPage, limit, currentSort);
 
     if ('error' in result) {
         return <div className="p-4 text-red-500">Error: {result.error}</div>;
@@ -21,6 +22,7 @@ export default async function NewsPage(props: {
         <NewsTable
             data={result.newsList || []}
             currentPage={currentPage}
+            currentSort={currentSort}
             totalPages={totalPages}
         />
     );

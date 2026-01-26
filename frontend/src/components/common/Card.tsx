@@ -41,8 +41,8 @@ const Card = memo(({ article, variant = 'medium' }: CardProps) => {
 
                 <Link href={`/news/${article.slug}`}>
                     <h2 className={`text-gray-900 font-black leading-[1.25] transition-colors duration-300 group-hover:text-primary font-main
-                        ${isLarge ? 'text-4xl md:text-5xl lg:text-6xl mb-4' : 'text-xl md:text-2xl mb-3'} 
-                        ${isHeroSide ? 'text-lg md:text-xl mb-2' : ''}`}>
+                        ${isLarge ? 'text-3xl md:text-4xl mb-4' : 'text-lg md:text-xl mb-3'} 
+                        ${isHeroSide ? 'text-base md:text-lg mb-2' : ''}`}>
                         {article.title}
                     </h2>
                 </Link>
@@ -50,7 +50,7 @@ const Card = memo(({ article, variant = 'medium' }: CardProps) => {
                 {/* Excerpt */}
                 {(isLarge || (!isSmall && !isList && !isHeroSide)) && (
                     <p className={`text-gray-700 leading-relaxed font-main mb-4 
-                        ${isLarge ? 'text-xl md:text-2xl' : 'text-lg md:text-xl'}`}>
+                        ${isLarge ? 'text-base md:text-lg' : 'text-sm md:text-base'}`}>
                         {article.excerpt}
                     </p>
                 )}

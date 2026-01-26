@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useTransition, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import {
     Form,
     FormControl,
-    FormDescription,
     FormField,
     FormItem,
     FormLabel,
@@ -16,10 +15,8 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Category } from '@/types';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useEffect } from 'react';
 
 const formSchema = z.object({
     name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -28,12 +25,15 @@ const formSchema = z.object({
 });
 
 interface CategoryFormProps {
-    initialData?: any; // strict typing 'Category' might miss name_bn if not in interface yet
+    initialData?: any;
     action: (prevState: any, formData: FormData) => Promise<any>;
 }
 
 export function CategoryForm({ initialData, action: serverAction }: CategoryFormProps) {
-    const [state, formAction, isPending] = useActionState(serverAction, null);
+    const [state, formAction, isPendingState] = useActionState(serverAction, null);
+    const [isPendingTransition, startTransition] = useTransition();
+
+    const isPending = isPendingState || isPendingTransition;
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -52,18 +52,23 @@ export function CategoryForm({ initialData, action: serverAction }: CategoryForm
 
     return (
         <Form {...form}>
-            <form action={formAction} onSubmit={(evt) => {
-                evt.preventDefault();
-                form.handleSubmit(() => {
-                    const formData = new FormData();
-                    const values = form.getValues();
-                    Object.entries(values).forEach(([key, value]) => {
-                        if (value) formData.append(key, String(value));
-                    });
-                    formAction(formData);
-                })(evt);
-            }} className="space-y-8 max-w-xl">
-
+            <form
+                action={formAction}
+                onSubmit={(evt) => {
+                    evt.preventDefault();
+                    form.handleSubmit(() => {
+                        const formData = new FormData();
+                        const values = form.getValues();
+                        Object.entries(values).forEach(([key, value]) => {
+                            if (value) formData.append(key, String(value));
+                        });
+                        startTransition(() => {
+                            formAction(formData);
+                        });
+                    })(evt);
+                }}
+                className="space-y-8 max-w-xl"
+            >
                 <FormField
                     control={form.control}
                     name="name"

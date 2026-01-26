@@ -35,6 +35,7 @@ export interface CategoryViewStat {
 }
 
 export interface NewsViewStat {
+    id: string;
     title: string;
     views: number;
 }

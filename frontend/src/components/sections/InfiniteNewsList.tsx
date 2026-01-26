@@ -8,9 +8,10 @@ import { useInfiniteNews } from '@/hooks/queries/useNews';
 interface InfiniteNewsListProps {
     category?: string;
     sort?: string;
+    search?: string;
 }
 
-export default function InfiniteNewsList({ category, sort }: InfiniteNewsListProps) {
+export default function InfiniteNewsList({ category, sort, search }: InfiniteNewsListProps) {
     const { ref, inView } = useInView();
     const {
         data,
@@ -19,7 +20,7 @@ export default function InfiniteNewsList({ category, sort }: InfiniteNewsListPro
         isFetchingNextPage,
         isLoading,
         isError
-    } = useInfiniteNews({ limit: 12, category, sort });
+    } = useInfiniteNews({ limit: 12, category, sort, search });
 
     useEffect(() => {
         if (inView && hasNextPage && !isFetchingNextPage) {

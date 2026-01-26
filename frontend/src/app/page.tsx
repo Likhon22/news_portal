@@ -9,9 +9,9 @@ import Link from 'next/link';
 export default function Home() {
   const { data, isLoading } = useHomepage();
 
-  // Hero takes Featured + First 6 Latest (2 Secondary + 4 Side)
+  // Hero takes Featured + First 5 Latest (3 Side + 2 Secondary)
   // NewsGrid takes the rest of Latest
-  const newsGridItems = data?.latest?.slice(6) || [];
+  const newsGridItems = data?.latest?.slice(5) || [];
 
   return (
     <Layout>

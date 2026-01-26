@@ -3,38 +3,22 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Newspaper, Layers, Users, LogOut } from 'lucide-react';
+import { LayoutDashboard, Newspaper, Layers, Users } from 'lucide-react';
 
 const sidebarItems = [
-    {
-        title: 'Overview',
-        href: '/',
-        icon: LayoutDashboard,
-    },
-    {
-        title: 'News',
-        href: '/news',
-        icon: Newspaper,
-    },
-    {
-        title: 'Categories',
-        href: '/categories',
-        icon: Layers,
-    },
-    {
-        title: 'Users',
-        href: '/users',
-        icon: Users,
-    },
+    { title: 'Overview', href: '/', icon: LayoutDashboard },
+    { title: 'News', href: '/news', icon: Newspaper },
+    { title: 'Categories', href: '/categories', icon: Layers },
+    { title: 'Users', href: '/users', icon: Users },
 ];
 
 export function Sidebar() {
     const pathname = usePathname();
 
     return (
-        <div className="flex h-full w-64 flex-col justify-between border-r bg-gray-900 text-white flex-shrink-0">
+        <div className="hidden md:flex h-full w-64 flex-col justify-between border-r bg-gray-900 text-white">
             <div className="p-6">
-                <h1 className="text-2xl font-bold tracking-tight mb-8 text-primary">News CMS</h1>
+                <h1 className="text-2xl font-bold tracking-tight mb-8 text-white">News CMS</h1>
                 <nav className="space-y-2">
                     {sidebarItems.map((item) => (
                         <Link

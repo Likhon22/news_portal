@@ -8,7 +8,7 @@ export const useNews = (params?: Parameters<typeof newsService.getAll>[0]) => {
     });
 };
 
-export const useInfiniteNews = (params?: { limit?: number; category?: string; sort?: string; featured?: boolean }) => {
+export const useInfiniteNews = (params?: { limit?: number; category?: string; sort?: string; featured?: boolean; search?: string }) => {
     return useInfiniteQuery({
         queryKey: ['news', 'infinite', params],
         queryFn: ({ pageParam = 1 }) => newsService.getAll({ ...params, page: pageParam as number }),

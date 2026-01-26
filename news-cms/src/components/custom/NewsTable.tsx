@@ -20,22 +20,32 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Edit, Trash2, Plus, Loader2 } from 'lucide-react';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Edit, Trash2, Plus, Loader2, ListFilter } from 'lucide-react';
 import Link from 'next/link';
 import { News } from '@/types';
 import { deleteNewsAction } from '@/app/(dashboard)/news/actions';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
 interface NewsTableProps {
     data: News[];
     totalPages: number;
     currentPage: number;
+    currentSort: string;
 }
 
-export function NewsTable({ data, totalPages, currentPage }: NewsTableProps) {
+export function NewsTable({ data, totalPages, currentPage, currentSort }: NewsTableProps) {
     const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -55,18 +65,39 @@ export function NewsTable({ data, totalPages, currentPage }: NewsTableProps) {
         }
     };
 
+    const handleSortChange = (value: string) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('sort', value);
+        params.set('page', '1'); // Reset to page 1 on sort change
+        router.push(`${pathname}?${params.toString()}`);
+    };
+
     return (
         <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-bold tracking-tight">News Articles</h2>
-                <Link href="/news/create">
-                    <Button>
-                        <Plus className="mr-2 h-4 w-4" /> Create News
-                    </Button>
-                </Link>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h2 className="text-2xl md:text-3xl font-bold tracking-tight">News Articles</h2>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <Select value={currentSort} onValueChange={handleSortChange}>
+                        <SelectTrigger className="w-full sm:w-[180px] bg-white">
+                            <ListFilter className="w-4 h-4 mr-2 text-gray-500" />
+                            <SelectValue placeholder="Sort by" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="latest">Latest First</SelectItem>
+                            <SelectItem value="oldest">Oldest First</SelectItem>
+                            <SelectItem value="views_desc">Views (High to Low)</SelectItem>
+                            <SelectItem value="views_asc">Views (Low to High)</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Link href="/news/create">
+                        <Button className="w-full sm:w-auto">
+                            <Plus className="mr-2 h-4 w-4" /> Create News
+                        </Button>
+                    </Link>
+                </div>
             </div>
 
-            <div className="rounded-md border bg-white">
+            <div className="rounded-md border bg-white overflow-x-auto">
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -123,28 +154,33 @@ export function NewsTable({ data, totalPages, currentPage }: NewsTableProps) {
             </div>
 
             {/* Basic Pagination Controls */}
-            <div className="flex justify-end gap-2">
-                <Button
-                    variant="outline"
-                    disabled={currentPage <= 1}
-                    onClick={() => router.push(`/news?page=${currentPage - 1}`)}
-                >
-                    Previous
-                </Button>
-                <Button
-                    variant="outline"
-                    disabled={currentPage >= totalPages}
-                    onClick={() => router.push(`/news?page=${currentPage + 1}`)}
-                >
-                    Next
-                </Button>
+            <div className="flex justify-between items-center">
+                <p className="text-sm text-gray-600">
+                    Page {currentPage} of {totalPages} ({data.length} items)
+                </p>
+                <div className="flex gap-2">
+                    <Button
+                        variant="outline"
+                        disabled={currentPage <= 1}
+                        onClick={() => router.push(`${pathname}?page=${currentPage - 1}&sort=${currentSort}`)}
+                    >
+                        Previous
+                    </Button>
+                    <Button
+                        variant="outline"
+                        disabled={currentPage >= totalPages}
+                        onClick={() => router.push(`${pathname}?page=${currentPage + 1}&sort=${currentSort}`)}
+                    >
+                        Next
+                    </Button>
+                </div>
             </div>
 
             <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-                <AlertDialogContent>
+                <AlertDialogContent aria-describedby="delete-news-description">
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
+                        <AlertDialogDescription id="delete-news-description">
                             This action cannot be undone. This will permanently delete the news article.
                         </AlertDialogDescription>
                     </AlertDialogHeader>

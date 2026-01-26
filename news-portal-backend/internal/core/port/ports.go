@@ -20,9 +20,12 @@ type OwnerRepository interface {
 
 type CategoryRepository interface {
 	CreateCategory(ctx context.Context, category *domain.Category) (*domain.Category, error)
+	UpdateCategory(ctx context.Context, category *domain.Category) error
+	DeleteCategory(ctx context.Context, id uuid.UUID) error
 	ListCategories(ctx context.Context) ([]*domain.Category, error)
 	GetCategoryBySlug(ctx context.Context, slug string) (*domain.Category, error)
 	CountCategories(ctx context.Context) (int64, error)
+	GetCategoryByID(ctx context.Context, id uuid.UUID) (*domain.Category, error)
 }
 
 type NewsRepository interface {
@@ -30,10 +33,10 @@ type NewsRepository interface {
 	UpdateNews(ctx context.Context, news *domain.News) error
 	DeleteNews(ctx context.Context, id uuid.UUID) error
 	GetNewsBySlug(ctx context.Context, slug string) (*domain.News, error)
-	ListNews(ctx context.Context, limit, offset int32, categoryID *uuid.UUID, sortBy string, isFeatured *bool) ([]*domain.News, error)
+	ListNews(ctx context.Context, limit, offset int32, categoryID *uuid.UUID, sortBy string, isFeatured *bool, search string) ([]*domain.News, error)
 	IncrementNewsViews(ctx context.Context, slug string) error
 	CheckSlugExists(ctx context.Context, slug string) (bool, error)
-	CountNews(ctx context.Context) (int64, error)
+	CountNews(ctx context.Context, categoryID *uuid.UUID, isFeatured *bool, search string) (int64, error)
 	CountTotalViews(ctx context.Context) (int64, error)
 	GetCategoryViewStats(ctx context.Context) ([]CategoryViewStat, error)
 	GetMonthlyTopNews(ctx context.Context, limit int) ([]NewsViewStat, error)
@@ -44,6 +47,7 @@ type AuthService interface {
 	Register(ctx context.Context, name, email, password string) (*domain.Owner, error)
 	ChangePassword(ctx context.Context, id uuid.UUID, oldPassword, newPassword string) error
 	ListUsers(ctx context.Context) ([]*domain.Owner, error)
+	GetMe(ctx context.Context, id uuid.UUID) (*domain.Owner, error)
 }
 
 type NewsService interface {
@@ -51,12 +55,15 @@ type NewsService interface {
 	UpdateNews(ctx context.Context, id uuid.UUID, categoryID uuid.UUID, title, excerpt, content, thumbnail string, isFeatured bool) error
 	DeleteNews(ctx context.Context, id uuid.UUID) error
 	GetNewsBySlug(ctx context.Context, slug string) (*domain.News, error)
-	ListNews(ctx context.Context, page, limit int32, categorySlug string, sortBy string, isFeatured *bool) ([]*domain.News, error)
+	ListNews(ctx context.Context, page, limit int32, categorySlug string, sortBy string, isFeatured *bool, search string) ([]*domain.News, int64, error)
 	CheckSlug(ctx context.Context, slug string) (bool, error)
 	GetHomepageData(ctx context.Context) (*HomepageData, error)
 }
 
 type CategoryService interface {
+	CreateCategory(ctx context.Context, name, nameBN, description string) (*domain.Category, error)
+	UpdateCategory(ctx context.Context, id uuid.UUID, name, nameBN, description string) error
+	DeleteCategory(ctx context.Context, id uuid.UUID) error
 	ListCategories(ctx context.Context) ([]*domain.Category, error)
 }
 
@@ -70,6 +77,7 @@ type CategoryViewStat struct {
 }
 
 type NewsViewStat struct {
+	ID    string `json:"id"`
 	Title string `json:"title"`
 	Views int64  `json:"views"`
 }

@@ -121,6 +121,29 @@ func (h *AuthHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(users)
 }
 
+func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	userIDStr, ok := r.Context().Value("user_id").(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusInternalServerError)
+		return
+	}
+
+	user, err := h.svc.GetMe(r.Context(), userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
+}
+
 // News Handler
 
 type NewsHandler struct {
@@ -298,7 +321,9 @@ func (h *NewsHandler) ListNews(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	newsList, err := h.svc.ListNews(r.Context(), int32(page), int32(limit), category, sort, isFeatured)
+	search := r.URL.Query().Get("search")
+
+	newsList, total, err := h.svc.ListNews(r.Context(), int32(page), int32(limit), category, sort, isFeatured, search)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -307,6 +332,7 @@ func (h *NewsHandler) ListNews(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"newsList": newsList,
+		"total":    total,
 	})
 }
 
@@ -362,6 +388,72 @@ type CategoryHandler struct {
 
 func NewCategoryHandler(svc port.CategoryService) *CategoryHandler {
 	return &CategoryHandler{svc: svc}
+}
+
+func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name        string `json:"name"`
+		NameBN      string `json:"name_bn"`
+		Description string `json:"description"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	category, err := h.svc.CreateCategory(r.Context(), req.Name, req.NameBN, req.Description)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(category)
+}
+
+func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		Name        string `json:"name"`
+		NameBN      string `json:"name_bn"`
+		Description string `json:"description"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	err = h.svc.UpdateCategory(r.Context(), id, req.Name, req.NameBN, req.Description)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *CategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	err = h.svc.DeleteCategory(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *CategoryHandler) ListCategories(w http.ResponseWriter, r *http.Request) {

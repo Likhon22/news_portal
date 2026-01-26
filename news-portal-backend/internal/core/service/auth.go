@@ -83,3 +83,7 @@ func (s *AuthService) ChangePassword(ctx context.Context, id uuid.UUID, oldPassw
 func (s *AuthService) ListUsers(ctx context.Context) ([]*domain.Owner, error) {
 	return s.repo.ListOwners(ctx)
 }
+
+func (s *AuthService) GetMe(ctx context.Context, id uuid.UUID) (*domain.Owner, error) {
+	return s.repo.GetOwnerByID(ctx, id)
+}

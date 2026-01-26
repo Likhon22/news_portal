@@ -115,6 +115,9 @@ func main() {
 	categoryHandler := handler.NewCategoryHandler(categoryService)
 	newsHandler := handler.NewNewsHandler(newsService, fileService)
 
+	// SEED HANDLER - DELETE BEFORE PRODUCTION
+	seedHandler := handler.NewSeedHandler(newsService)
+
 	// Stats
 	statsService := service.NewStatsService(store, store, store)
 	statsHandler := handler.NewStatsHandler(statsService)
@@ -139,7 +142,14 @@ func main() {
 
 	// Routes
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Post("/auth/login", authHandler.Login)
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/login", authHandler.Login)
+			r.Group(func(r chi.Router) {
+				r.Use(handler.AuthMiddleware(jwtSecret))
+				r.Get("/me", authHandler.GetMe)
+			})
+		})
+
 		r.Get("/categories", categoryHandler.ListCategories)
 		r.Get("/news", newsHandler.ListNews)
 		r.Get("/news/homepage", newsHandler.GetHomepage)
@@ -149,14 +159,24 @@ func main() {
 
 		r.Group(func(r chi.Router) {
 			r.Use(handler.AuthMiddleware(jwtSecret))
+
+			// News Management
 			r.Post("/news", newsHandler.CreateNews)
 			r.Put("/news/{id}", newsHandler.UpdateNews)
 			r.Delete("/news/{id}", newsHandler.DeleteNews)
+
+			// Category management
+			r.Post("/categories", categoryHandler.CreateCategory)
+			r.Put("/categories/{id}", categoryHandler.UpdateCategory)
+			r.Delete("/categories/{id}", categoryHandler.DeleteCategory)
 
 			// Admin user management
 			r.Get("/users", authHandler.ListUsers)
 			r.Post("/users", authHandler.Register)
 			r.Post("/users/change-password", authHandler.ChangePassword)
+
+			// SEED ENDPOINT - DELETE BEFORE PRODUCTION
+			r.Post("/SEED_news", seedHandler.SEED_CreateNews)
 		})
 	})
 

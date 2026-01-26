@@ -1,8 +1,23 @@
+'use client';
+
 import Link from 'next/link';
-import { categories } from '@/data/categories';
+import { useCategories } from '@/hooks/queries/useCategories';
 import { FacebookIcon, TwitterIcon, InstagramIcon, YouTubeIcon } from '@/components/common/Icons';
 
 export default function Footer() {
+    const { data: categories, isLoading, error } = useCategories();
+
+    const renderCategoryLinks = () => {
+        if (isLoading) return <div className="text-gray-600 text-sm italic">লোড হচ্ছে...</div>;
+        if (error || !categories) return null;
+
+        return categories.map(cat => (
+            <Link key={cat.id} href={`/${cat.slug}`} className="text-gray-400 hover:text-primary transition-colors text-lg font-bold">
+                {cat.name_bn || cat.name}
+            </Link>
+        ));
+    };
+
     return (
         <footer className="bg-[#0a0a0a] text-white pt-16 pb-12 mt-20 border-t-8 border-primary">
             <div className="container px-4">
@@ -21,11 +36,7 @@ export default function Footer() {
                 {/* 2. Category Grid Section - High Breathability */}
                 <div className="border-t border-gray-900 pt-16 mb-16">
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-y-6 gap-x-8">
-                        {categories.map(cat => (
-                            <Link key={cat.id} href={`/${cat.slug}`} className="text-gray-400 hover:text-primary transition-colors text-lg font-bold">
-                                {cat.name.bn}
-                            </Link>
-                        ))}
+                        {renderCategoryLinks()}
                     </div>
                 </div>
 

@@ -59,13 +59,26 @@ export function NewsForm({ categories, initialData, action: serverAction }: News
         const file = e.target.files?.[0];
         if (!file) return;
 
+        // Validation: Limit to 2MB
+        const MAX_SIZE = 2 * 1024 * 1024; // 2MB
+        if (file.size > MAX_SIZE) {
+            toast.error('Image is too large. Please select an image smaller than 2MB.');
+            e.target.value = ''; // Clear selection
+            return;
+        }
+
         // Instant local preview
         const localUrl = URL.createObjectURL(file);
         setThumbnailPreview(localUrl);
 
         // Store the file object in the form state
         form.setValue('thumbnail', file as any);
-        toast.success('Image selected');
+
+        if (file.size > 1024 * 1024) {
+            toast.info('Note: Images under 1MB are recommended for faster loading.');
+        } else {
+            toast.success('Image selected');
+        }
     };
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -91,11 +104,12 @@ export function NewsForm({ categories, initialData, action: serverAction }: News
 
             if (result?.error) {
                 toast.error(result.error);
-            } else {
+            } else if (result?.success) {
                 toast.success(initialData ? 'News updated successfully' : 'News published successfully');
-                if (!initialData) {
+                // Navigate to news list after short delay
+                setTimeout(() => {
                     window.location.href = '/news';
-                }
+                }, 500);
             }
         } catch (error) {
             toast.error('Submission failed. Please check your network.');
@@ -195,6 +209,9 @@ export function NewsForm({ categories, initialData, action: serverAction }: News
                                 </div>
                             </FormControl>
                             <input type="hidden" {...field} />
+                            <FormDescription className="text-xs italic text-gray-500">
+                                Recommended: Less than 1MB. Max allowed: 2MB. Best ratio: 16:9
+                            </FormDescription>
                             <FormMessage />
                             {thumbnailPreview && (
                                 <div className="mt-2 relative h-40 w-full max-w-xs border rounded overflow-hidden bg-muted">
