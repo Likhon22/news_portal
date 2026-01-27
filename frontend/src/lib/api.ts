@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+const API_URL = (typeof window === 'undefined' ? process.env.INTERNAL_API_URL : process.env.NEXT_PUBLIC_API_URL);
+
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1',
+    baseURL: API_URL,
     headers: {
         'Content-Type': 'application/json',
     },

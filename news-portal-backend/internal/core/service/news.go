@@ -35,7 +35,7 @@ func NewNewsService(repo port.NewsRepository, categoryRepo port.CategoryReposito
 }
 
 func (s *NewsService) CreateNews(ctx context.Context, authorID, categoryID uuid.UUID, title, excerpt, content, thumbnail string, isFeatured bool) (*domain.News, error) {
-	slug := generateSlug(title)
+	slug := generateUniqueSlug(title)
 	sanitizedContent := s.p.Sanitize(content)
 
 	news := &domain.News{
@@ -167,7 +167,7 @@ func (s *NewsService) GetHomepageData(ctx context.Context) (*port.HomepageData, 
 	}, nil
 }
 
-func generateSlug(title string) string {
+func generateRawSlug(title string) string {
 	// Convert to lowercase
 	slug := strings.ToLower(title)
 
@@ -186,7 +186,15 @@ func generateSlug(title string) string {
 	// Trim leading and trailing hyphens
 	slug = strings.Trim(slug, "-")
 
-	return fmt.Sprintf("%s-%d", slug, time.Now().Unix())
+	return slug
+}
+
+func generateCleanSlug(title string) string {
+	return generateRawSlug(title)
+}
+
+func generateUniqueSlug(title string) string {
+	return fmt.Sprintf("%s-%d", generateRawSlug(title), time.Now().Unix())
 }
 
 // Category Service
@@ -200,7 +208,7 @@ func NewCategoryService(repo port.CategoryRepository) *CategoryService {
 }
 
 func (s *CategoryService) CreateCategory(ctx context.Context, name, nameBN, description string) (*domain.Category, error) {
-	slug := generateSlug(name)
+	slug := generateCleanSlug(name)
 	category := &domain.Category{
 		Name:        name,
 		NameBN:      &nameBN,
@@ -211,7 +219,7 @@ func (s *CategoryService) CreateCategory(ctx context.Context, name, nameBN, desc
 }
 
 func (s *CategoryService) UpdateCategory(ctx context.Context, id uuid.UUID, name, nameBN, description string) error {
-	slug := generateSlug(name)
+	slug := generateCleanSlug(name)
 	category := &domain.Category{
 		ID:          id,
 		Name:        name,

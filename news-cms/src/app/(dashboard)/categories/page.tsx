@@ -1,6 +1,8 @@
 import { getCategoriesAction } from './actions';
 import { CategoryTable } from '@/components/custom/CategoryTable';
 
+export const dynamic = 'force-dynamic';
+
 export default async function CategoriesPage() {
     const result = await getCategoriesAction();
 

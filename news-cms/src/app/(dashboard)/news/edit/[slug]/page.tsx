@@ -2,6 +2,8 @@ import { getNewsBySlug, updateNewsAction } from '../actions';
 import { getCategoriesAction } from '@/app/(dashboard)/categories/actions';
 import { NewsForm } from '@/components/custom/NewsForm';
 
+export const dynamic = 'force-dynamic';
+
 export default async function EditNewsPage(props: {
     params: Promise<{ slug: string }>;
 }) {

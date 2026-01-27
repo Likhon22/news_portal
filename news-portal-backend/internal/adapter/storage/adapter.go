@@ -95,7 +95,7 @@ func (a *Adapter) ListOwners(ctx context.Context) ([]*domain.Owner, error) {
 	}
 	defer rows.Close()
 
-	var owners []*domain.Owner
+	owners := []*domain.Owner{}
 	for rows.Next() {
 		o := &domain.Owner{}
 		if err := rows.Scan(&o.ID, &o.Name, &o.Email, &o.Role, &o.CreatedAt); err != nil {
@@ -137,7 +137,7 @@ func (a *Adapter) ListCategories(ctx context.Context) ([]*domain.Category, error
 	}
 	defer rows.Close()
 
-	var categories []*domain.Category
+	categories := []*domain.Category{}
 	for rows.Next() {
 		c := &domain.Category{}
 		if err := rows.Scan(&c.ID, &c.Name, &c.NameBN, &c.Slug, &c.Description, &c.CreatedAt); err != nil {
@@ -328,7 +328,7 @@ func (a *Adapter) ListNews(ctx context.Context, limit, offset int32, categoryID 
 	}
 	defer rows.Close()
 
-	var newsList []*domain.News
+	newsList := []*domain.News{}
 	for rows.Next() {
 		n := &domain.News{}
 		if err := rows.Scan(

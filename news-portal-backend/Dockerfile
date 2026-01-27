@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN go build -o main ./cmd/api/main.go
+RUN go build -o main ./cmd/api
 
 # Final stage
 FROM alpine:latest
@@ -26,7 +26,6 @@ RUN apk add --no-cache ca-certificates tzdata
 
 # Copy the binary from the builder stage
 COPY --from=builder /app/main .
-COPY --from=builder /app/.env.example ./.env
 COPY --from=builder /app/migrations ./migrations
 
 # Expose the API port

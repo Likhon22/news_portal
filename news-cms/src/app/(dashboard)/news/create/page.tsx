@@ -2,6 +2,8 @@ import { getCategoriesAction } from '@/app/(dashboard)/categories/actions';
 import { createNewsAction } from './actions';
 import { NewsForm } from '@/components/custom/NewsForm';
 
+export const dynamic = 'force-dynamic';
+
 export default async function CreateNewsPage() {
     const categories = await getCategoriesAction();
 

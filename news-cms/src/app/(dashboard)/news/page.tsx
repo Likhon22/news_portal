@@ -1,6 +1,8 @@
 import { getNewsAction } from './actions';
 import { NewsTable } from '@/components/custom/NewsTable';
 
+export const dynamic = 'force-dynamic';
+
 export default async function NewsPage(props: {
     searchParams: Promise<{ page?: string; sort?: string }>;
 }) {

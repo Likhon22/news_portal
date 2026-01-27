@@ -11,14 +11,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
 	"news-portal-backend/internal/adapter/handler"
-	customMiddleware "news-portal-backend/internal/adapter/middleware"
 	"news-portal-backend/internal/adapter/storage"
 	"news-portal-backend/internal/core/port"
 	"news-portal-backend/internal/core/service"
@@ -58,7 +54,7 @@ func main() {
 	// CORS Config
 	corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
 	if corsOrigins == "" {
-		corsOrigins = "*" // Default/Dev fallback
+		corsOrigins = "*"
 		logger.Warn("CORS_ALLOWED_ORIGINS not set, allowing all origins")
 	}
 	allowedOrigins := strings.Split(corsOrigins, ",")
@@ -77,15 +73,45 @@ func main() {
 
 	// 3. Database
 	ctx := context.Background()
-	dbPool, err := pgxpool.New(ctx, dbURL)
+	var dbPool *pgxpool.Pool
+	var err error
+
+	// Retry connection with exponential backoff
+	maxRetries := 10
+	for i := 0; i < maxRetries; i++ {
+		dbPool, err = pgxpool.New(ctx, dbURL)
+		if err == nil {
+			// Test the connection
+			err = dbPool.Ping(ctx)
+			if err == nil {
+				break
+			}
+		}
+
+		logger.Warn("Database not ready, retrying...", "retry", i+1, "error", err)
+		time.Sleep(time.Duration(2*i+1) * time.Second)
+	}
+
 	if err != nil {
-		logger.Error("Unable to connect to database", "error", err)
+		logger.Error("Could not connect to database after retries", "error", err)
 		os.Exit(1)
 	}
 	defer dbPool.Close()
 
+	// 3b. Auto-Provisioning (Migration & Initial Data)
+	logger.Info("Checking for database migrations...")
+	if err := RunMigrations(dbURL); err != nil {
+		logger.Error("Failed to run migrations", "error", err)
+	}
+
 	// 4. Adapters & Services
 	store := storage.NewAdapter(dbPool)
+
+	logger.Info("Ensuring initial data...")
+	if err := EnsureInitialData(ctx, store); err != nil {
+		logger.Error("Failed to ensure initial data", "error", err)
+	}
+
 	authService := service.NewAuthService(store, jwtSecret)
 	categoryService := service.NewCategoryService(store)
 	newsService := service.NewNewsService(store, store)
@@ -114,79 +140,29 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService)
 	categoryHandler := handler.NewCategoryHandler(categoryService)
 	newsHandler := handler.NewNewsHandler(newsService, fileService)
-
-	// SEED HANDLER - DELETE BEFORE PRODUCTION
 	seedHandler := handler.NewSeedHandler(newsService)
-
-	// Stats
 	statsService := service.NewStatsService(store, store, store)
 	statsHandler := handler.NewStatsHandler(statsService)
 
-	// 5. Router & Middleware
-	r := chi.NewRouter()
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger) // Chi's default logger is okay for dev, but for prod maybe replace with custom slog middleware (Day 2)
-	r.Use(middleware.Recoverer)
-
-	// Security Middleware
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   allowedOrigins,
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: true,
-		MaxAge:           300,
-	}))
-	r.Use(customMiddleware.RateLimitMiddleware(rps, burst))
-
-	// Routes
-	r.Route("/api/v1", func(r chi.Router) {
-		r.Route("/auth", func(r chi.Router) {
-			r.Post("/login", authHandler.Login)
-			r.Group(func(r chi.Router) {
-				r.Use(handler.AuthMiddleware(jwtSecret))
-				r.Get("/me", authHandler.GetMe)
-			})
-		})
-
-		r.Get("/categories", categoryHandler.ListCategories)
-		r.Get("/news", newsHandler.ListNews)
-		r.Get("/news/homepage", newsHandler.GetHomepage)
-		r.Get("/news/check-slug", newsHandler.CheckSlug)
-		r.Get("/news/{slug}", newsHandler.GetNews)
-		r.Get("/stats", statsHandler.GetStats)
-
-		r.Group(func(r chi.Router) {
-			r.Use(handler.AuthMiddleware(jwtSecret))
-
-			// News Management
-			r.Post("/news", newsHandler.CreateNews)
-			r.Put("/news/{id}", newsHandler.UpdateNews)
-			r.Delete("/news/{id}", newsHandler.DeleteNews)
-
-			// Category management
-			r.Post("/categories", categoryHandler.CreateCategory)
-			r.Put("/categories/{id}", categoryHandler.UpdateCategory)
-			r.Delete("/categories/{id}", categoryHandler.DeleteCategory)
-
-			// Admin user management
-			r.Get("/users", authHandler.ListUsers)
-			r.Post("/users", authHandler.Register)
-			r.Post("/users/change-password", authHandler.ChangePassword)
-
-			// SEED ENDPOINT - DELETE BEFORE PRODUCTION
-			r.Post("/SEED_news", seedHandler.SEED_CreateNews)
-		})
+	// 5. Router Setup
+	router := NewRouter(RouterConfig{
+		AllowedOrigins:  allowedOrigins,
+		RPS:             rps,
+		Burst:           burst,
+		JWTSecret:       jwtSecret,
+		AuthHandler:     authHandler,
+		CategoryHandler: categoryHandler,
+		NewsHandler:     newsHandler,
+		StatsHandler:    statsHandler,
+		SeedHandler:     seedHandler,
 	})
 
 	// 6. Graceful Shutdown Setup
 	srv := &http.Server{
 		Addr:    ":" + serverPort,
-		Handler: r,
+		Handler: router,
 	}
 
-	// Run server in a goroutine
 	go func() {
 		logger.Info("Server starting", "port", serverPort, "env", appEnv)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -195,13 +171,11 @@ func main() {
 		}
 	}()
 
-	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	logger.Info("Shutting down server...")
 
-	// Create a deadline to wait for.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -210,24 +184,4 @@ func main() {
 	}
 
 	logger.Info("Server exiting")
-}
-
-// FileServer conveniently sets up a http.FileServer handler at a given path.
-func FileServer(r chi.Router, path string, root http.FileSystem) {
-	if strings.ContainsAny(path, "{}*") {
-		panic("FileServer does not permit any URL parameters.")
-	}
-
-	if path != "/" && path[len(path)-1] != '/' {
-		r.Get(path, http.RedirectHandler(path+"/", 301).ServeHTTP)
-		path += "/"
-	}
-	path += "*"
-
-	r.Get(path, func(w http.ResponseWriter, r *http.Request) {
-		rctx := chi.RouteContext(r.Context())
-		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
-		fs := http.StripPrefix(pathPrefix, http.FileServer(root))
-		fs.ServeHTTP(w, r)
-	})
 }
