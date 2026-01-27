@@ -35,7 +35,7 @@ const Card = memo(({ article, variant = 'medium' }: CardProps) => {
 
             {/* Content Container */}
             <div className="flex flex-col flex-1">
-                <Link href={`/category/${article.category_slug}`} className="text-primary text-[13px] font-black mb-2 uppercase tracking-widest hover:underline">
+                <Link href={`/${article.category_slug}`} className="text-primary text-[13px] font-black mb-2 uppercase tracking-widest hover:underline">
                     {article.category_name}
                 </Link>
 
