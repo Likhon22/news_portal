@@ -4,9 +4,11 @@ const AUTH_COOKIE = 'auth-token';
 
 export async function setAuthToken(token: string) {
     const cookieStore = await cookies();
+    const isSecure = process.env.AUTH_COOKIE_SECURE === 'true';
+
     cookieStore.set(AUTH_COOKIE, token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: isSecure,
         sameSite: 'strict',
         path: '/',
         // Set expiry to matches JWT expiry (e.g., 7 days) or session
