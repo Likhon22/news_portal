@@ -7,11 +7,12 @@ import { useInfiniteNews } from '@/hooks/queries/useNews';
 
 interface InfiniteNewsListProps {
     category?: string;
+    authorId?: string;
     sort?: string;
     search?: string;
 }
 
-export default function InfiniteNewsList({ category, sort, search }: InfiniteNewsListProps) {
+export default function InfiniteNewsList({ category, authorId, sort, search }: InfiniteNewsListProps) {
     const { ref, inView } = useInView();
     const {
         data,
@@ -20,7 +21,7 @@ export default function InfiniteNewsList({ category, sort, search }: InfiniteNew
         isFetchingNextPage,
         isLoading,
         isError
-    } = useInfiniteNews({ limit: 12, category, sort, search });
+    } = useInfiniteNews({ limit: 12, category, authorId, sort, search });
 
     useEffect(() => {
         if (inView && hasNextPage && !isFetchingNextPage) {

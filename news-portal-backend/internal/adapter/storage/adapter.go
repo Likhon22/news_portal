@@ -292,7 +292,7 @@ func (a *Adapter) GetNewsBySlug(ctx context.Context, slug string) (*domain.News,
 	return n, nil
 }
 
-func (a *Adapter) ListNews(ctx context.Context, limit, offset int32, categoryID *uuid.UUID, sortBy string, isFeatured *bool, search string) ([]*domain.News, error) {
+func (a *Adapter) ListNews(ctx context.Context, limit, offset int32, categoryID *uuid.UUID, authorID *uuid.UUID, sortBy string, isFeatured *bool, search string) ([]*domain.News, error) {
 	orderBy := "n.published_at DESC"
 	switch sortBy {
 	case "popular", "views_desc":
@@ -320,9 +320,10 @@ func (a *Adapter) ListNews(ctx context.Context, limit, offset int32, categoryID 
 	          AND ($3::uuid IS NULL OR n.category_id = $3)
 	          AND ($4::boolean IS NULL OR n.is_featured = $4)
 	          AND ($5::text IS NULL OR n.title ILIKE $5)
+	          AND ($6::uuid IS NULL OR n.author_id = $6)
 	          ORDER BY ` + orderBy + ` LIMIT $1 OFFSET $2`
 
-	rows, err := a.db.Query(ctx, query, limit, offset, categoryID, isFeatured, searchPtr)
+	rows, err := a.db.Query(ctx, query, limit, offset, categoryID, isFeatured, searchPtr, authorID)
 	if err != nil {
 		return nil, err
 	}

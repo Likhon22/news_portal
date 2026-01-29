@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (a *Adapter) CountNews(ctx context.Context, categoryID *uuid.UUID, isFeatured *bool, search string) (int64, error) {
+func (a *Adapter) CountNews(ctx context.Context, categoryID *uuid.UUID, authorID *uuid.UUID, isFeatured *bool, search string) (int64, error) {
 	var searchPtr *string
 	if search != "" {
 		pattern := "%" + search + "%"
@@ -19,10 +19,11 @@ func (a *Adapter) CountNews(ctx context.Context, categoryID *uuid.UUID, isFeatur
 	          WHERE n.status = 'published' AND n.published_at <= NOW()
 	          AND ($1::uuid IS NULL OR n.category_id = $1)
 	          AND ($2::boolean IS NULL OR n.is_featured = $2)
-	          AND ($3::text IS NULL OR n.title ILIKE $3)`
+	          AND ($3::text IS NULL OR n.title ILIKE $3)
+	          AND ($4::uuid IS NULL OR n.author_id = $4)`
 
 	var count int64
-	err := a.db.QueryRow(ctx, query, categoryID, isFeatured, searchPtr).Scan(&count)
+	err := a.db.QueryRow(ctx, query, categoryID, isFeatured, searchPtr, authorID).Scan(&count)
 	return count, err
 }
 

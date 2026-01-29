@@ -322,8 +322,17 @@ func (h *NewsHandler) ListNews(w http.ResponseWriter, r *http.Request) {
 	}
 
 	search := r.URL.Query().Get("search")
+	authorIDStr := r.URL.Query().Get("author_id")
 
-	newsList, total, err := h.svc.ListNews(r.Context(), int32(page), int32(limit), category, sort, isFeatured, search)
+	var authorID *uuid.UUID
+	if authorIDStr != "" {
+		id, err := uuid.Parse(authorIDStr)
+		if err == nil {
+			authorID = &id
+		}
+	}
+
+	newsList, total, err := h.svc.ListNews(r.Context(), int32(page), int32(limit), category, authorID, sort, isFeatured, search)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

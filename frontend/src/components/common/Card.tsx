@@ -57,7 +57,9 @@ const Card = memo(({ article, variant = 'medium' }: CardProps) => {
 
                 {/* Author & Meta */}
                 <div className="flex items-center gap-3 text-gray-500 text-xs md:text-sm font-black uppercase tracking-tight mt-auto">
-                    <span className="text-gray-900">{article.author_name}</span>
+                    <Link href={`/author/${article.author_id}`} className="text-gray-900 hover:text-primary transition-colors">
+                        {article.author_name}
+                    </Link>
                     <span className="text-gray-300">|</span>
                     <span>{formattedDate}</span>
                 </div>
